@@ -1,0 +1,1 @@
+# regexp-equality-automate
