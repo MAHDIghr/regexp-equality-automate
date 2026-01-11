@@ -95,6 +95,12 @@ def decalage(a, offset):
 def union(a1, a2):
     """Retourne l'automate qui reconnaît l'union des 
     langages reconnus par les automates a1 et a2""" 
+    if (a1.n == a2.n and 
+        sorted(a1.final) == sorted(a2.final) and
+        a1.transition == a2.transition):
+        # Retourner une copie du même automate car a + a = a  
+        return a1
+        
     a2_shifted = decalage(a2, a1.n)
     res = automate()
     res.n = a1.n + a2_shifted.n + 2
