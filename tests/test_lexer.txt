@@ -1,0 +1,8 @@
+(a+b)*.c
+a*.c + b*.c
+ab(c+a)*
+E
+a+b*
+(a.b)+c
+((a))
+a-b

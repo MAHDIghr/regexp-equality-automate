@@ -1,3 +1,4 @@
+# version 2: correction d'un bug dans la fonction minimisation
 import copy as cp
 
 
@@ -69,19 +70,67 @@ class automate:
 def concatenation(a1, a2): 
     """Retourne l'automate qui reconnaît la concaténation des 
     langages reconnus par les automates a1 et a2"""
-    return a
+    a2_shifted = decalage(a2, a1.n)
+    res = automate()
+    res.n = a1.n + a2.n
+    res.transition.update(a1.transition)
+    res.transition.update(a2_shifted.transition)
+    for f in a1.final:
+        res.ajoute_transition(f, "E", [a1.n])
+    res.final = a2_shifted.final
+    res.name = f"({a1.name}.{a2.name})"
+    return res
 
+# --- HELPER POUR DECALAGE D'ETATS ---
+def decalage(a, offset):
+    res = cp.deepcopy(a)
+    res.n += 0 
+    res.final = [f + offset for f in a.final]
+    new_trans = {}
+    for (etat, char), cibles in a.transition.items():
+        new_trans[(etat + offset, char)] = [c + offset for c in cibles]
+    res.transition = new_trans
+    return res
 
 def union(a1, a2):
     """Retourne l'automate qui reconnaît l'union des 
     langages reconnus par les automates a1 et a2""" 
-    return a
+    a2_shifted = decalage(a2, a1.n)
+    res = automate()
+    res.n = a1.n + a2_shifted.n + 2
+    start = 0
+    final = res.n - 1
+    a1_in = decalage(a1, 1)
+    a2_in = decalage(a2_shifted, 1)
+    res.transition.update(a1_in.transition)
+    res.transition.update(a2_in.transition)
+    res.ajoute_transition(start, "E", [1, 1 + a1.n])
+    for f in a1_in.final:
+        res.ajoute_transition(f, "E", [final])
+    for f in a2_in.final:
+        res.ajoute_transition(f, "E", [final])
+    res.final = [final]
+    res.name = f"({a1.name}+{a2.name})"
+    return res
 
 
 def etoile(a):
     """Retourne l'automate qui reconnaît l'étoile de Kleene du 
     langage reconnu par l'automate a""" 
-    return a
+    res = automate()
+    res.n = a.n + 2
+    start = 0
+    final = res.n - 1
+    a_shifted = decalage(a, 1)
+    res.transition.update(a_shifted.transition)
+    res.ajoute_transition(start, "E", [1])
+    res.ajoute_transition(start, "E", [final])
+    for f in a_shifted.final:
+        res.ajoute_transition(f, "E", [1])
+        res.ajoute_transition(f, "E", [final])
+    res.final = [final]
+    res.name = f"({a.name})*"
+    return res
 
 
 def acces_epsilon(a):
@@ -142,14 +191,53 @@ def determinisation(a):
         la construction garantit que tous les états sont accessibles
         automate d'entrée sans epsilon-transitions
     """        
-    return a
+    res = automate()
+    res.name = "Det(" + a.name + ")"
+    start_set = frozenset([0])
+    subsets = {start_set: 0}
+    queue = [start_set]
+    res.n = 0
+    res.transition = {}
+    res.final = []
+    
+    while queue:
+        current_set = queue.pop(0)
+        current_id = subsets[current_set]
+        res.n += 1
+        if not current_set.isdisjoint(a.final):
+            res.final.append(current_id)
+        for char in a.alphabet:
+            target_set = set()
+            for state in current_set:
+                if (state, char) in a.transition:
+                    target_set.update(a.transition[(state, char)])
+            if not target_set: continue
+            target_froz = frozenset(target_set)
+            if target_froz not in subsets:
+                subsets[target_froz] = len(subsets)
+                queue.append(target_froz)
+            res.transition[(current_id, char)] = [subsets[target_froz]]
+    return res
     
     
 def completion(a):
     """ retourne l'automate a complété
         l'automate en entrée doit être déterministe
     """
-    return a
+    res = cp.deepcopy(a)
+    poubelle = res.n
+    added_poubelle = False
+    for state in range(res.n):
+        for char in res.alphabet:
+            if (state, char) not in res.transition:
+                if not added_poubelle:
+                    res.n += 1
+                    added_poubelle = True
+                res.transition[(state, char)] = [poubelle]
+    if added_poubelle:
+        for char in res.alphabet:
+            res.transition[(poubelle, char)] = [poubelle]
+    return res
 
 
 ###################################################
@@ -233,9 +321,29 @@ def egal(a1, a2):
     """ retourne True si a1 et a2 sont isomorphes
         a1 et a2 doivent être minimaux
     """
-    return True
-
-
-
-# TESTS
-# à écrire
+    if a1.n != a2.n or len(a1.final) != len(a2.final):
+        return False
+    def canoniser(aut):
+        mapping = {}
+        new_id = 0
+        queue = [0]
+        mapping[0] = 0
+        normalized_trans = {}
+        normalized_final = set()
+        while queue:
+            q = queue.pop(0)
+            mapped_q = mapping[q]
+            for char in sorted(aut.alphabet):
+                if (q, char) in aut.transition:
+                    target = aut.transition[(q, char)][0]
+                    if target not in mapping:
+                        new_id += 1
+                        mapping[target] = new_id
+                        queue.append(target)
+                    normalized_trans[(mapped_q, char)] = mapping[target]
+            if q in aut.final:
+                normalized_final.add(mapped_q)
+        return normalized_trans, normalized_final
+    t1, f1 = canoniser(a1)
+    t2, f2 = canoniser(a2)
+    return t1 == t2 and f1 == f2

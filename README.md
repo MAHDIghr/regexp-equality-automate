@@ -87,15 +87,6 @@ chmod +x src/runner.sh
 
 ---
 
-## 🧑‍🤝‍🧑 Travail en binôme
-
-| Branche Git | Rôle |
-|------------|-----|
-| feature/parser-yacc | Analyse lexicale et syntaxique |
-| feature/automate-ops | Opérations sur automates |
-
----
-
 ## 📚 Technologies
 
 - Python 3  
